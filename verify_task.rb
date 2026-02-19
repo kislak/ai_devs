@@ -11,35 +11,23 @@ questions = data['pytania'] || data['questions']
 
 puts "Questions: #{questions.inspect}"
 
-# 2. Sequential solving with improved heuristics (No LLM)
+# 2. Sequential solving (No LLM, whole question)
 answers = questions.map do |q|
-  # Keyword extraction heuristic
-  # Skip common starters, look for capitalized word OR specific topic indicators
-  stop_words = %w[Jak Jaka Jako Jakie Która Który Kto W O Z Za Na Ile]
-  keyword = q.scan(/[A-ZŚŁŹŻĆŃÓĄĘ][a-zżźćńółęąś]+/).reject { |w| stop_words.include?(w) }.first || 
-            q.scan(/partia|rok|waluta|wybory|robot|hel|ziemia|kolonia/i).first || 
-            q.split.last.delete('?')
+  # Fetch hint from /api-wiedza using the WHOLE question
+  # Ensure we encode everything, and maybe try without the trailing question mark if it fails
+  encoded_q = URI.encode_www_form_component(q.delete('?'))
+  uri = URI("#{BASE_URL}/api-wiedza/#{encoded_q}")
   
-  # Simple normalization
-  keyword = keyword.to_s.gsub(/ie$|u$|y$/ , '') # Basic suffix removal
-  keyword = 'Mars'    if keyword =~ /Mars/i
-  keyword = 'Księżyc' if keyword =~ /Księżyc/i
-  keyword = 'roboty'  if keyword =~ /robot/i
-  keyword = 'ropa'    if keyword =~ /rop/i
-  
-  # Fetch hint from /api-wiedza (with delay to avoid rate limit)
-  sleep 2
-  uri = URI("#{BASE_URL}/api-wiedza/#{URI.encode_www_form_component(keyword)}")
+  sleep 1 # Small delay to be safe
   res = Net::HTTP.get(uri)
   hint = JSON.parse(res)['hint'] rescue nil
   
-  # Answer extraction: take first relevant NOUN or number, skip common words
+  # Answer extraction: take first relevant NOUN or number
   if hint
     is_year_question = q =~ /rok|kiedy/i
     skip_h = %w[To Jest Była W Z I Na O Do Ze Została Ta Ten To Wybory Prezydentem]
     candidates = hint.scan(/[A-ZŚŁŹŻĆŃÓĄĘ][a-zżźćńółęąś]+|\d+/).reject { |w| skip_h.include?(w) }
     
-    # Prioritize based on question type
     answer = if is_year_question
                candidates.find { |c| c =~ /^\d+$/ }
              else

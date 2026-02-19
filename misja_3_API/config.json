@@ -1,0 +1,5 @@
+{
+  "base_url": "https://story.aidevs.pl",
+  "verification_endpoint": "/api-weryfikacja",
+  "knowledge_endpoint": "/api-wiedza/"
+}
